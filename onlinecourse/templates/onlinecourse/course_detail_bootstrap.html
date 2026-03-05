@@ -40,6 +40,7 @@
     </nav>
 
     <!-- Page content -->
+     
     <div class="container-fluid">
             <h2>{{ course.name }}</h2>
             <div class="card-columns-vertical">
@@ -51,6 +52,19 @@
                 {% endfor %}
             </div>
             <!-- Course detail template changes go here -->
+            {%if user.is_authenticated %}
+            <button class = "button">Start Exam</button>
+            </div>
+        {% for question in course.question_set.all %} 
+        {{ question.content }}
+        {% for choice in question.choice_set.all %}
+        {{choice.content}}
+        {%csrf_token %}
+        {% endfor %}Submit
+            <div>
+
+            {% endif %}
     </div>
+    
 </body>
 </html>
