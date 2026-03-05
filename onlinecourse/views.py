@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.http import HttpResponseRedirect
 # <HINT> Import any new Models here
-from .models import Course, Enrollment
+from .models import Course, Enrollment, Question, Choice, Submission
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
@@ -88,6 +88,13 @@ class CourseDetailView(generic.DetailView):
     model = Course
     template_name = 'onlinecourse/course_detail_bootstrap.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        course = context.get('course')
+        user = self.request.user
+        context['is_enrolled'] = check_if_enrolled(user, course)
+        return context
+
 
 def enroll(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
@@ -110,17 +117,34 @@ def enroll(request, course_id):
          # Collect the selected choices from exam form
          # Add each selected choice object to the submission object
          # Redirect to show_exam_result with the submission id
-#def submit(request, course_id):
+
+def submit(request, course_id):
+    # Task 5: Submission evaluation logic
+    course = get_object_or_404(Course, pk=course_id)
+    user = request.user
+    enrollment = Enrollment.objects.get(user=user, course=course)
+    submission = Submission.objects.create(enrollment=enrollment)
+    choices_ids = extract_answers(request)
+    # set the many-to-many relationship in one step
+    submission.choices.set(Choice.objects.filter(id__in=choices_ids))
+    submission_id = submission.id
+    return HttpResponseRedirect(reverse(viewname='onlinecourse:show_exam_result',
+                                        args=(course_id, submission_id)))
 
 
 # An example method to collect the selected choices from the exam form from the request object
 def extract_answers(request):
    submitted_anwsers = []
+   # request.POST is a QueryDict; use getlist to capture multiple values for same key
    for key in request.POST:
        if key.startswith('choice'):
-           value = request.POST[key]
-           choice_id = int(value)
-           submitted_anwsers.append(choice_id)
+           values = request.POST.getlist(key)
+           for value in values:
+               try:
+                   choice_id = int(value)
+                   submitted_anwsers.append(choice_id)
+               except ValueError:
+                   logger.error(f"Invalid choice value {value}")
    return submitted_anwsers
 
 
@@ -130,7 +154,35 @@ def extract_answers(request):
         # Get the selected choice ids from the submission record
         # For each selected choice, check if it is a correct answer or not
         # Calculate the total score
-#def show_exam_result(request, course_id, submission_id):
+
+def show_exam_result(request, course_id, submission_id):
+    # evaluation view according to Task 5 instructions
+    context = {}
+    course = get_object_or_404(Course, pk=course_id)
+    submission = Submission.objects.get(id=submission_id)
+    choices = submission.choices.all()
+
+    total_score = 0
+    max_score = 0
+    questions = course.question_set.all()
+    for question in questions:
+        max_score += question.grade
+        correct_choices = question.choice_set.filter(is_correct=True)
+        selected_choices = choices.filter(question=question)
+        # score question only if all correct answers were chosen
+        if set(correct_choices) == set(selected_choices):
+            total_score += question.grade
+
+    # Calculate percentage score (normalize to 100)
+    if max_score > 0:
+        percentage_score = int((total_score / max_score) * 100)
+    else:
+        percentage_score = 0
+
+    context['course'] = course
+    context['grade'] = percentage_score
+    context['choices'] = choices
+    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
 
 
 

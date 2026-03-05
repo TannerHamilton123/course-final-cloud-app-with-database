@@ -52,17 +52,33 @@
                 {% endfor %}
             </div>
             <!-- Course detail template changes go here -->
-            {%if user.is_authenticated %}
-            <button class = "button">Start Exam</button>
-            </div>
-        {% for question in course.question_set.all %} 
-        {{ question.content }}
-        {% for choice in question.choice_set.all %}
-        {{choice.content}}
-        {%csrf_token %}
-        {% endfor %}Submit
-            <div>
+            {% if user.is_authenticated and is_enrolled %}
+            <!-- start button reveals hidden exam form -->
+            <button id="startExamBtn" class="btn btn-primary mb-3">Start Exam</button>
 
+            <!-- hidden form with questions and choices -->
+            <form id="examForm" action="{% url 'onlinecourse:submit' course.id %}" method="post" style="display:none;">
+                {% csrf_token %}
+                {% for question in course.question_set.all %}
+                    <div class="mb-3">
+                        <p><strong>Question {{ forloop.counter }}: {{ question.content }}</strong></p>
+                        {% for choice in question.choice_set.all %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="choice{{ question.id }}" value="{{ choice.id }}" id="choice{{ choice.id }}">
+                                <label class="form-check-label" for="choice{{ choice.id }}">{{ choice.content }}</label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-success">Submit</button>
+            </form>
+
+            <script>
+                document.getElementById('startExamBtn').addEventListener('click', function() {
+                    document.getElementById('examForm').style.display = 'block';
+                    this.style.display = 'none';
+                });
+            </script>
             {% endif %}
     </div>
     
